@@ -1,0 +1,28 @@
+<resources>
+    <string name="app_name">ScreenShare</string>
+    <string name="un_known">未知指令</string>
+    <string name="input_ip">请输入ip地址</string>
+    <string name="client_connect">客户端连接</string>
+    <string name="server_run">服务启动</string>
+    <string name="request_media_projection_fail">请求录屏失败</string>
+    <string name="mediaprojection_is_null">未初始化系统录屏服务</string>
+    <string name="send_data_error">发送数据异常</string>
+    <string name="socket_client_close_error">关闭客户端socket异常</string>
+    <string name="socket_close">socket关闭</string>
+    <string name="server_socket_close_error">服务socket关闭异常</string>
+    <string name="server_socket_close">服务socket关闭</string>
+    <string name="server_socket_create_error">服务socket创建失败</string>
+    <string name="codec_create_error">创建codec失败</string>
+    <string name="codec_error">编码异常</string>
+    <string name="wait_connect">等待连接</string>
+    <string name="connect_server_error">连接服务端失败</string>
+    <string name="connect_server">已连接服务器</string>
+    <string name="receive_data_error">接收数据异常</string>
+    <string name="close_client">关闭客户端</string>
+    <string name="server_is_not_open">服务未开启</string>
+    <string name="on_frame_fail">绘制失败</string>
+    <string name="create_codec_decoder">创建解码器失败</string>
+    <string name="wait_next_connect">等待下次连接</string>
+    <string name="client_connect_error">客户端连接错误</string>
+    <string name="create_output_stream_error">创建输出流异常</string>
+</resources>
