@@ -7,15 +7,13 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
-import android.graphics.PixelFormat;
 import android.media.projection.MediaProjectionManager;
-import android.net.ConnectivityManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.provider.Settings;
-import android.view.Gravity;
+import android.util.DisplayMetrics;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.Surface;
@@ -50,7 +48,7 @@ import static com.qjj.screenshare.MyApplication.*;
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
 
     private static final int REQUEST_MEDIA_PROJECTION = 11;
-    private RecordScreenServiceConnection recordScreenServiceConnection;
+    private RecordScreenServiceConnection recordScreenServiceConnection = null;
     private RecordScreenService.MyBinder myBinder;
     private Button recordButton;
     private Button playButton;
@@ -62,10 +60,18 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private boolean floatWindowIsShow = false;
     private SocketClientThread socketClientThread;
 
+    private long lastClickTime = 0;
+    private short screenSize = 2;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        WindowManager.LayoutParams lp = getWindow().getAttributes();
+        lp.flags |= WindowManager.LayoutParams.FLAG_FULLSCREEN;
+        getWindow().setAttributes(lp);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
 
         EventBus.getDefault().register(this);
         //初始化布局与监听
@@ -74,6 +80,16 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         initService();
         //显示本机ip地址
         localIpTextView.setText(getHostIP());
+
+        //get screen width and height
+        WindowManager wm = (WindowManager) getApplicationContext().getSystemService(Context.WINDOW_SERVICE);
+        DisplayMetrics dm = new DisplayMetrics();
+        if (null != wm) {
+            wm.getDefaultDisplay().getMetrics(dm);
+            width = dm.widthPixels;
+            height = dm.heightPixels;
+        }
+
     }
 
     /**
@@ -159,11 +175,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         } else {
             layoutParams.type = WindowManager.LayoutParams.TYPE_PHONE;
         }
-        layoutParams.format = PixelFormat.RGBA_8888;
-        layoutParams.gravity = Gravity.CENTER;
+        //layoutParams.format = PixelFormat.RGBA_8888;
+        //layoutParams.gravity = Gravity.CENTER;
         layoutParams.flags = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
-        layoutParams.width = 540;
-        layoutParams.height = 960;
+        layoutParams.width = width / 2;
+        layoutParams.height = height / 2;
         layoutParams.x = 0;
         layoutParams.y = 0;
         //初始化悬浮框
@@ -205,6 +221,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         public boolean onTouch(View view, MotionEvent event) {
             switch (event.getAction()) {
                 case MotionEvent.ACTION_DOWN:
+                    if (System.currentTimeMillis() - lastClickTime < 200) {
+                        setFloatWindowSize(view);
+                    } else {
+                        lastClickTime = System.currentTimeMillis();
+                    }
                     x = (int) event.getRawX();
                     y = (int) event.getRawY();
                     break;
@@ -225,6 +246,34 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             view.performClick();
             return true;
         }
+    }
+
+    private void setFloatWindowSize(View view) {
+        switch (screenSize) {
+            case 1:
+                layoutParams.width = width / 2;
+                layoutParams.height = height / 2;
+                break;
+            case 2:
+                layoutParams.width = (int) (width * 0.7);
+                layoutParams.height = (int) (height * 0.7);
+                break;
+            case 3:
+                layoutParams.width = (int) (width * 0.8);
+                layoutParams.height = (int) (height * 0.8);
+                break;
+            case 4:
+                layoutParams.width = width;
+                layoutParams.height = height;
+                break;
+            default:
+                break;
+        }
+        screenSize++;
+        if (screenSize == 5) {
+            screenSize = 1;
+        }
+        windowManager.updateViewLayout(view, layoutParams);
     }
 
     /**
@@ -480,12 +529,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     @Override
     protected void onDestroy() {
-        super.onDestroy();
-
         myBinder.stopShare();
-
-        unbindService(recordScreenServiceConnection);
-
+        if (recordScreenServiceConnection != null) {
+            unbindService(recordScreenServiceConnection);
+        }
         updateClientState(false);
         if (socketClientThread != null) {
             socketClientThread.exit();
@@ -493,5 +540,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         if (EventBus.getDefault().isRegistered(this)) {
             EventBus.getDefault().unregister(this);
         }
+        super.onDestroy();
     }
 }

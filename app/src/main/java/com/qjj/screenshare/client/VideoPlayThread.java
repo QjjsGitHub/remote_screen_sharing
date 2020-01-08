@@ -40,8 +40,8 @@ public class VideoPlayThread extends Thread {
                 if (linkedListVideo.size() <= 0) {
                     continue;
                 }
-                videoPack = linkedListVideo.getFirst();
-                linkedListVideo.removeFirst();
+                videoPack = linkedListVideo.getLast();
+                linkedListVideo.removeLast();
             }
             if (videoPack != null) {
                 if (!hasInitVideo) {

@@ -9,7 +9,8 @@ import android.view.Surface;
 
 import com.qjj.screenshare.entity.MessageEvent;
 import com.qjj.screenshare.MyApplication;
-import com.qjj.screenshare.entity.VideoPack;
+import com.qjj.screenshare.util.CRC;
+import com.qjj.screenshare.util.CombinValue;
 
 import org.greenrobot.eventbus.EventBus;
 
@@ -19,6 +20,9 @@ import static com.qjj.screenshare.MyApplication.CODEC_CREATE_ERROE;
 import static com.qjj.screenshare.MyApplication.CODEC_ERROR;
 import static com.qjj.screenshare.MyApplication.CODEC_SERVER_RUN;
 import static com.qjj.screenshare.MyApplication.MEDIA_PROJECTION_IS_NULL;
+import static com.qjj.screenshare.MyApplication.TYPE1;
+import static com.qjj.screenshare.MyApplication.TYPE2;
+import static com.qjj.screenshare.MyApplication.width;
 
 /**
  * 创建日期：2019/11/21 11:46
@@ -63,9 +67,9 @@ public class MyEncoder extends Thread {
     private boolean createVirtualDisplay() {
         MediaProjection mediaProjection = MyApplication.getMediaProjection();
         if (mediaProjection != null) {
-            mediaProjection.createVirtualDisplay("display",
-                    videoW, videoH, 1,
-                    DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC,
+            mediaProjection.createVirtualDisplay("-display",
+                    videoW, videoH, 420,
+                    DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
                     mSurface, null, null);
         } else {
             EventBus.getDefault().post(new MessageEvent(MEDIA_PROJECTION_IS_NULL));
@@ -80,11 +84,17 @@ public class MyEncoder extends Thread {
             //颜色格式
             format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
             //码流
-            format.setInteger(MediaFormat.KEY_BIT_RATE, videoBitrate);
+            format.setInteger(MediaFormat.KEY_BIT_RATE, videoW * videoH * 2);
             //帧数
             format.setInteger(MediaFormat.KEY_FRAME_RATE, videoFrameRate);
             // 关键帧 5秒
-            format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, -1);
+            format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1);
+
+            format.setInteger(MediaFormat.KEY_LATENCY, 1);
+
+            format.setInteger(MediaFormat.KEY_CAPTURE_RATE, videoFrameRate);
+
+            format.setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR);
 
             codec = MediaCodec.createEncoderByType(MIME);
             codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
@@ -162,12 +172,31 @@ public class MyEncoder extends Thread {
     }
 
     private void onH264(byte[] buffer, int type, long ts) {
-        byte[] bytes = new byte[buffer.length];
-        System.arraycopy(buffer, 0, bytes, 0, buffer.length);
+        int length = buffer.length;
+        byte[] bytes = new byte[4 + 4 + 8 + 1 + length];
 
-        VideoPack pack = new VideoPack(bytes, type, ts);
+        int offset = 0;
+
+        //CRC 四字节
+        /*System.arraycopy(CombinValue.intToByte(CRC.getIntCRC(buffer)), 0, bytes, offset, 4);*/
+        offset += 4;
+
+        //数据长度 四字节
+        System.arraycopy(CombinValue.intToByte(length), 0, bytes, offset, 4);
+        offset += 4;
+
+        //ts 八字节
+        System.arraycopy(CombinValue.longToBytes(ts), 0, bytes, offset, 8);
+        offset += 8;
+
+        //type
+        bytes[offset] = (type == 1) ? TYPE1 : TYPE2;
+        offset += 1;
+
+        System.arraycopy(buffer, 0, bytes, offset, buffer.length);
+
         if (socketServerThread != null) {
-            socketServerThread.putVideoPack(pack);
+            socketServerThread.putVideoPack(bytes);
         }
     }
 }

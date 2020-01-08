@@ -3,12 +3,11 @@ package com.qjj.screenshare.server;
 import android.util.Log;
 
 import com.qjj.screenshare.entity.MessageEvent;
-import com.qjj.screenshare.entity.VideoPack;
 
 import org.greenrobot.eventbus.EventBus;
 
 import java.io.IOException;
-import java.io.ObjectOutputStream;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -28,9 +27,14 @@ public class SocketServerThread extends Thread {
     private long sumPack = 0;
     private long lostPack = 0;
 
-    private LinkedList<VideoPack> linkedListVideo = new LinkedList<>();
+    private OutputStream outputStream = null;
+    private InputStream inputStream = null;
+
+    private LinkedList<byte[]> linkedListVideo = new LinkedList<>();
 
     private Socket socket;
+
+    private int sendDataError = 0;
 
     @Override
     public void run() {
@@ -42,9 +46,8 @@ public class SocketServerThread extends Thread {
             EventBus.getDefault().post(new MessageEvent(SERVER_SOCKET_CREATE_ERROR));
         }
         while (!exit) {
-            OutputStream outputStream;
-            ObjectOutputStream objectOutputStream = null;
-            VideoPack videoPack;
+
+            byte[] videoPack;
             //try {
             //客户端连接成功
             EventBus.getDefault().post(new MessageEvent(WAIT_CONNECT));
@@ -67,7 +70,7 @@ public class SocketServerThread extends Thread {
 
                 try {
                     outputStream = socket.getOutputStream();
-                    objectOutputStream = new ObjectOutputStream(outputStream);
+                    inputStream = socket.getInputStream();
                 } catch (IOException e) {
                     if (!exit) {
                         exit = true;
@@ -80,32 +83,38 @@ public class SocketServerThread extends Thread {
                 continue;
             }
 
-            int sendDataError = 0;
             while (!exit) {
+
+                byte[] result = new byte[1];
+
                 synchronized (linkedListVideo) {
                     if (linkedListVideo.size() <= 0) {
                         continue;
                     }
-                    videoPack = linkedListVideo.getFirst();
-                    linkedListVideo.removeFirst();
+                    videoPack = linkedListVideo.getLast();
+                    linkedListVideo.removeLast();
+                }
+                if (!write(videoPack)) {
+                    break;
                 }
 
                 try {
-                    objectOutputStream.writeObject(videoPack);
+                    inputStream.read(result);
                 } catch (IOException e) {
-                    sendDataError++;
-                    EventBus.getDefault().post(new MessageEvent(SEND_DATA_ERROR));
-                    if (sendDataError > 3) {
-                        myEncoder.close();
-                        myEncoder = null;
-                        break;
-                    }
+                    e.printStackTrace();
+                }
+
+                if (result[0] == CRC_FAIL) {
+                    Log.d("---", "CRC_FAIL");
                 }
             }
 
             try {
-                if (objectOutputStream != null) {
-                    objectOutputStream.close();
+                if (inputStream != null) {
+                    inputStream.close();
+                }
+                if (outputStream != null) {
+                    outputStream.close();
                 }
                 if (socket != null) {
                     socket.close();
@@ -117,15 +126,31 @@ public class SocketServerThread extends Thread {
         exit();
     }
 
-    public void putVideoPack(VideoPack videoPack) {
+    private boolean write(byte[] videoPack) {
+        try {
+            //Log.d("+++", "write: " + videoPack.length);
+            outputStream.write(videoPack);
+            outputStream.flush();
+        } catch (IOException e) {
+            sendDataError++;
+            if (sendDataError > 3) {
+                EventBus.getDefault().post(new MessageEvent(SEND_DATA_ERROR));
+                myEncoder.close();
+                myEncoder = null;
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public void putVideoPack(byte[] videoPack) {
         synchronized (linkedListVideo) {
             sumPack++;
             if (linkedListVideo.size() >= VIDEO_PACK_LIST_MAX_LENGTH) {
                 lostPack++;
-                EventBus.getDefault().post(new MessageEvent(LOST_PACK, ((lostPack * 100) / sumPack) + "%"));
-                linkedListVideo.removeFirst();
+                EventBus.getDefault().post(new MessageEvent(LOST_PACK, "server:" + ((lostPack * 100) / sumPack) + "%"));
+                linkedListVideo.removeLast();
             }
-            //Log.d("send", ":" + linkedListVideo.size());
             linkedListVideo.push(videoPack);
         }
     }

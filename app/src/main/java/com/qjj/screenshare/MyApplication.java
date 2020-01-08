@@ -12,6 +12,18 @@ public class MyApplication extends Application {
 
     static Surface surface;
 
+    /*format type list*/
+    public static final byte VIDEO = (byte) 0x00;
+    public static final byte AUDIO = (byte) 0x01;
+
+    /*data type list*/
+    public static final byte TYPE1 = (byte) 0x00;
+    public static final byte TYPE2 = (byte) 0x01;
+
+    /*data type list*/
+    public static final byte CRC_OK = (byte) 0x01;
+    public static final byte CRC_FAIL = (byte) 0x00;
+
     public final static int OPEN_FLOAT_WINDOW = 1;
     public final static int IP_IS_NULL = 2;
     public final static int MEDIA_PROJECTION_IS_NULL = 3;
@@ -41,7 +53,7 @@ public class MyApplication extends Application {
 
     public static int width = 1080;
     public static int height = 1920;
-    public static int videoBitrate = 16777216;
+    public static int videoBitrate = width * height * 4;
     public static int videoFrameRate = 24;
 
     public static Surface getSurface() {
