@@ -79,7 +79,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         //初始化服务
         initService();
         //显示本机ip地址
-        localIpTextView.setText(getHostIP());
+        String ip = getHostIP();
+        localIpTextView.setText(ip);
+        ipEditText.setText(ip);
 
         //get screen width and height
         WindowManager wm = (WindowManager) getApplicationContext().getSystemService(Context.WINDOW_SERVICE);
@@ -506,9 +508,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 myBinder.startShare(resultCode, data);
             } else {
                 reConnect();
-                tasks.add(() -> {
-                    startShare(resultCode, data);
-                });
+                tasks.add(() -> startShare(resultCode, data));
             }
         }
 
