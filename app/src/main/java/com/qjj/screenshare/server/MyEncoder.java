@@ -9,6 +9,7 @@ import android.view.Surface;
 
 import com.qjj.screenshare.entity.MessageEvent;
 import com.qjj.screenshare.MyApplication;
+import com.qjj.screenshare.util.ByteArrayPool;
 import com.qjj.screenshare.util.CombineValue;
 
 import org.greenrobot.eventbus.EventBus;
@@ -31,10 +32,10 @@ import static com.qjj.screenshare.MyApplication.TYPE2;
 public class MyEncoder extends Thread {
 
     private MediaCodec codec;
-    private int videoW;
-    private int videoH;
+    private final int videoW;
+    private final int videoH;
     private int videoBitrate;
-    private int videoFrameRate;
+    private final int videoFrameRate;
     private Surface mSurface;
 
     private final int TIMEOUT_USEC = 12000;
@@ -45,7 +46,7 @@ public class MyEncoder extends Thread {
     private static final String TAG = "Encoder";
     private static final String MIME = "Video/AVC";
 
-    private SocketServerThread socketServerThread;
+    private final SocketServerThread socketServerThread;
 
     public MyEncoder(SocketServerThread socketServerThread) {
         this.videoW = MyApplication.width;
@@ -178,7 +179,8 @@ public class MyEncoder extends Thread {
 
     private void onH264(byte[] buffer, int type, long ts) {
         int length = buffer.length;
-        byte[] bytes = new byte[4 + 4 + 8 + 1 + length];
+        int totalLength = 4 + 4 + 8 + 1 + length;
+        byte[] bytes = ByteArrayPool.get(totalLength);
 
         int offset = 0;
 
@@ -201,7 +203,7 @@ public class MyEncoder extends Thread {
         System.arraycopy(buffer, 0, bytes, offset, buffer.length);
 
         if (socketServerThread != null) {
-            socketServerThread.putVideoPack(bytes);
+            socketServerThread.putVideoPack(bytes, totalLength);
         }
     }
 }

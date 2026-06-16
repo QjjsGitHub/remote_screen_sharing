@@ -3,6 +3,7 @@ package com.qjj.screenshare.server;
 import android.util.Log;
 
 import com.qjj.screenshare.entity.MessageEvent;
+import com.qjj.screenshare.util.ByteArrayPool;
 
 import org.greenrobot.eventbus.EventBus;
 
@@ -30,7 +31,17 @@ public class SocketServerThread extends Thread {
     private OutputStream outputStream = null;
     private InputStream inputStream = null;
 
-    private final LinkedList<byte[]> linkedListVideo = new LinkedList<>();
+    private final LinkedList<VideoData> linkedListVideo = new LinkedList<>();
+
+    private static class VideoData {
+        byte[] data;
+        int size;
+
+        VideoData(byte[] data, int size) {
+            this.data = data;
+            this.size = size;
+        }
+    }
 
     private int sendDataError = 0;
 
@@ -45,7 +56,6 @@ public class SocketServerThread extends Thread {
         }
         while (!exit) {
 
-            byte[] videoPack;
             //try {
             //客户端连接成功
             EventBus.getDefault().post(new MessageEvent(WAIT_CONNECT));
@@ -85,17 +95,20 @@ public class SocketServerThread extends Thread {
             while (!exit) {
 
                 byte[] result = new byte[1];
+                VideoData videoData;
 
                 synchronized (linkedListVideo) {
                     if (linkedListVideo.size() <= 0) {
                         continue;
                     }
-                    videoPack = linkedListVideo.getLast();
+                    videoData = linkedListVideo.getLast();
                     linkedListVideo.removeLast();
                 }
-                if (!write(videoPack)) {
+                if (!write(videoData.data, videoData.size)) {
+                    ByteArrayPool.release(videoData.data);
                     break;
                 }
+                ByteArrayPool.release(videoData.data);
 
                 try {
                     inputStream.read(result);
@@ -125,10 +138,10 @@ public class SocketServerThread extends Thread {
         exit();
     }
 
-    private boolean write(byte[] videoPack) {
+    private boolean write(byte[] videoPack, int size) {
         try {
             //Log.d("+++", "write: " + videoPack.length);
-            outputStream.write(videoPack);
+            outputStream.write(videoPack, 0, size);
             outputStream.flush();
         } catch (IOException e) {
             sendDataError++;
@@ -142,15 +155,16 @@ public class SocketServerThread extends Thread {
         return true;
     }
 
-    public void putVideoPack(byte[] videoPack) {
+    public void putVideoPack(byte[] videoPack, int size) {
         synchronized (linkedListVideo) {
             sumPack++;
             if (linkedListVideo.size() >= VIDEO_PACK_LIST_MAX_LENGTH) {
                 lostPack++;
                 EventBus.getDefault().post(new MessageEvent(LOST_PACK, "server:" + ((lostPack * 100) / sumPack) + "%"));
-                linkedListVideo.removeLast();
+                VideoData removed = linkedListVideo.removeLast();
+                ByteArrayPool.release(removed.data);
             }
-            linkedListVideo.push(videoPack);
+            linkedListVideo.push(new VideoData(videoPack, size));
         }
     }
 
