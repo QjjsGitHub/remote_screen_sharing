@@ -77,12 +77,16 @@ public class SocketServerThread extends Thread {
 
                 // 阻塞读取，直到客户端断开（心跳检测）
                 while (!exit && socket.isConnected()) {
-                    if (is.read() == -1) break;
+                    if (is.read() == -1) {
+                        break;
+                    }
                 }
             } catch (IOException e) {
                 Log.e("SocketServer", "客户端连接断开: " + e.getMessage());
             } finally {
-                if (dos != null) clientStreams.remove(dos);
+                if (dos != null) {
+                    clientStreams.remove(dos);
+                }
                 try { socket.close(); } catch (IOException ignored) {}
                 
                 // 检查并尝试停止编码器（如果没有客户端了）

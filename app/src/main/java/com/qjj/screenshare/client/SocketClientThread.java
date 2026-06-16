@@ -64,14 +64,16 @@ public class SocketClientThread extends Thread {
 
             try {
                 inputStream = client.getInputStream();
+                outputStream = client.getOutputStream();
                 // 使用 DataInputStream 简化大端字节序数据的解析
                 DataInputStream dis = new DataInputStream(inputStream);
 
                 while (!exit) {
-
-                    int dataLength = dis.readInt(); // 获取当前帧的有效负载长度
-                    long presentationTimeUs = dis.readLong(); // 获取呈现时间戳
-
+                    // 1. 解析自定义协议头部（必须与服务端顺序完全一致）
+                    dis.readInt(); // 读取并跳过 CRC 校验位 (4字节)
+                    int dataLength = dis.readInt(); // 获取当前帧的有效负载长度 (4字节)
+                    long presentationTimeUs = dis.readLong(); // 获取呈现时间戳 (8字节)
+                    dis.readByte(); // 读取并跳过帧类型标识 (1字节)
 
                     // 2. 稳定读取完整的帧数据内容
                     byte[] videoPack = new byte[dataLength];
@@ -88,9 +90,12 @@ public class SocketClientThread extends Thread {
                     }
 
                     // 4. 将接收到的 H.264 数据送入解码器
-                    videoDecoder.onFrame(videoPack, 0, dataLength, presentationTimeUs);
+                    if (hasInitVideo) {
+                        videoDecoder.onFrame(videoPack, 0, dataLength, presentationTimeUs);
+                    }
 
-
+                    // 5. 向服务端回复 ACK（用于服务端检测连接状态）
+                    outputStream.write(CRC_OK);
                 }
             } catch (Throwable e) {
                 if (!exit) {
