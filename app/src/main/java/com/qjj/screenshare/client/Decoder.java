@@ -21,7 +21,7 @@ import static com.qjj.screenshare.MyApplication.ON_FRAME_FAIL;
 public class Decoder {
     private MediaCodec mCodec;
     private Surface mSurface;
-    private final static String MIME_TYPE = "video/avc"; // H.264 格式
+    private final static String MIME_TYPE = MediaFormat.MIMETYPE_VIDEO_HEVC; // H.265 格式
 
     private final int videoWidth;
     private final int videoHeight;
@@ -37,16 +37,22 @@ public class Decoder {
      */
     public boolean initDecoder() {
         try {
+            // 创建 H.264 解码器
             mCodec = MediaCodec.createDecoderByType(MIME_TYPE);
+            
+            // 创建视频格式配置
             MediaFormat mediaFormat = MediaFormat.createVideoFormat(MIME_TYPE, videoWidth, videoHeight);
             
-            // 启用低延迟解码模式 (Android 11+)
+            // 启用低延迟解码模式 (Android 11+ / API 30+)
+            // 设为 1 指示解码器在接收到帧后立即尝试解码并显示，不要为了平滑性而缓存
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
                 mediaFormat.setInteger(MediaFormat.KEY_LOW_LATENCY, 1);
             }
 
-            // 配置解码器，设置渲染 Surface
+            // 配置解码器：关联输出 Surface
             mCodec.configure(mediaFormat, mSurface, null, 0);
+            
+            // 启动解码器
             mCodec.start();
             return true;
         } catch (IOException e) {

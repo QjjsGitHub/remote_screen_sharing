@@ -42,7 +42,7 @@ public class MyEncoder extends Thread {
 
     private boolean exit = false;
 
-    private static final String MIME = "Video/AVC"; // H.264 编码格式
+    private static final String MIME = MediaFormat.MIMETYPE_VIDEO_HEVC; // H.265 编码格式
     private final List<DataOutputStream> clientStreams; // 客户端流列表（用于广播）
 
     public MyEncoder(List<DataOutputStream> clientStreams) {
@@ -50,6 +50,7 @@ public class MyEncoder extends Thread {
         this.videoH = MyApplication.height;
         this.videoFrameRate = MyApplication.videoFrameRate;
         this.clientStreams = clientStreams;
+
     }
 
     /**
@@ -75,7 +76,7 @@ public class MyEncoder extends Thread {
                     super.onStop();
                 }
             }, null);
-            
+
             mediaProjection.createVirtualDisplay("-display",
                     videoW, videoH, MyApplication.screenDpi,
                     DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
@@ -92,25 +93,38 @@ public class MyEncoder extends Thread {
      */
     private boolean initMediaCodec() {
         try {
+            // 创建 H.264 (AVC) 视频格式配置
             MediaFormat format = MediaFormat.createVideoFormat(MIME, videoW, videoH);
+
+            // 设置颜色格式：使用 Surface 输入（零拷贝，效率最高）
             format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
+
+            // 设置比特率：影响画质清晰度，此处计算公式基于分辨率
             format.setInteger(MediaFormat.KEY_BIT_RATE, videoW * videoH * 2);
+
+            // 设置目标帧率：每秒编码的画面数量
             format.setInteger(MediaFormat.KEY_FRAME_RATE, videoFrameRate);
-            // 关键帧间隔：1秒
+
+            // 设置关键帧(I帧)间隔：设为 1 秒，确保新接入的客户端能快速获取完整画面并解码
             format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1);
-            // 极致优化：禁用 B 帧（B 帧会导致严重的编解码延迟）
+
+            // 禁用 B 帧：B 帧会导致编码器缓存画面，显著增加延迟。设为 0 以保证实时性
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 format.setInteger(MediaFormat.KEY_MAX_B_FRAMES, 0);
             }
-            // 优先级设置：设置为最高优先级（实时流任务）
+
+            // 设置任务优先级：0 为最高优先级，确保系统优先调度编码任务
             format.setInteger(MediaFormat.KEY_PRIORITY, 0);
-            // 低延迟模式开关
+
+            // 低延迟开关：0 表示指示编码器尽快产出输出，不要进行内部缓冲
             format.setInteger(MediaFormat.KEY_LATENCY, 0);
+
+            // 设置码率控制模式：VBR (动态码率) 可在画面静止时降低带宽消耗
             format.setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR);
 
             codec = MediaCodec.createEncoderByType(MIME);
             codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
-            mSurface = codec.createInputSurface();
+            mSurface = codec.createInputSurface(); // 获取输入 Surface，对接 VirtualDisplay
             codec.start();
         } catch (Exception e) {
             EventBus.getDefault().post(new MessageEvent(CODEC_CREATE_ERROE));
@@ -177,7 +191,8 @@ public class MyEncoder extends Thread {
                 codec.stop();
                 codec.release();
             }
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
         codec = null;
     }
 

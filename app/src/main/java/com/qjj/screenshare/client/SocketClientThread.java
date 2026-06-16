@@ -94,9 +94,7 @@ public class SocketClientThread extends Thread {
                     }
 
                     // 4. 将接收到的 H.264 数据送入解码器
-                    if (hasInitVideo) {
-                        videoDecoder.onFrame(videoPack, 0, dataLength, presentationTimeUs);
-                    }
+                    videoDecoder.onFrame(videoPack, 0, dataLength, presentationTimeUs);
 
                     // 5. 向服务端回复 ACK（用于服务端检测连接状态）
                     outputStream.write(CRC_OK);

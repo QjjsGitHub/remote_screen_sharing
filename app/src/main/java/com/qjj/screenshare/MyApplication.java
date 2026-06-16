@@ -46,7 +46,7 @@ public class MyApplication extends Application {
     public static int height = 1920;        // 录制高度
     public static int screenDpi = 420;      // 屏幕密度
     public static int videoBitrate = width * height * 4; // 比特率
-    public static int videoFrameRate = 24;  // 帧率
+    public static int videoFrameRate = 60;  // 帧率
 
     /* 数据类型标识 */
     public static final byte TYPE1 = (byte) 0x00; // I 帧（关键帧）

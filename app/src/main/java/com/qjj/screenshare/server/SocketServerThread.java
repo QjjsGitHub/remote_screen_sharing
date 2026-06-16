@@ -31,7 +31,7 @@ public class SocketServerThread extends Thread {
     private ServerSocket serverSocket;
     private boolean exit = false;
     private MyEncoder myEncoder = null;
-    
+
     // 线程安全的客户端流列表，用于广播
     private final List<DataOutputStream> clientStreams = new CopyOnWriteArrayList<>();
 
@@ -64,7 +64,7 @@ public class SocketServerThread extends Thread {
             try {
                 socket.setTcpNoDelay(true);
                 socket.setSendBufferSize(1024 * 1024);
-                
+
                 OutputStream os = socket.getOutputStream();
                 InputStream is = socket.getInputStream();
                 dos = new DataOutputStream(os);
@@ -94,7 +94,7 @@ public class SocketServerThread extends Thread {
                     clientStreams.remove(dos);
                 }
                 try { socket.close(); } catch (IOException ignored) {}
-                
+
                 // 检查并尝试停止编码器（如果没有客户端了）
                 checkEncoderStatus();
             }
@@ -135,12 +135,12 @@ public class SocketServerThread extends Thread {
         } catch (IOException e) {
             EventBus.getDefault().post(new MessageEvent(SERVER_SOCKET_CLOSE_ERROR));
         }
-        
+
         for (DataOutputStream dos : clientStreams) {
             try { dos.close(); } catch (IOException ignored) {}
         }
         clientStreams.clear();
-        
+
         if (myEncoder != null) {
             myEncoder.close();
         }
