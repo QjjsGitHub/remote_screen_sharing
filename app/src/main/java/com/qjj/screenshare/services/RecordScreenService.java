@@ -45,9 +45,6 @@ public class RecordScreenService extends Service {
             myBinder = new MyBinder();
         }
         initNotificationChannel();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            buildNotification(R.mipmap.ic_launcher, "屏幕分享", "服务正在运行");
-        }
     }
 
     @Override
@@ -58,7 +55,9 @@ public class RecordScreenService extends Service {
     public class MyBinder extends Binder {
 
         public void startShare(int resultCode, Intent data) {
-
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                buildNotification(R.mipmap.ic_launcher, "屏幕分享", "正在分享屏幕");
+            }
             mediaProjection = mediaProjectionManager.getMediaProjection(resultCode, data);
             MyApplication.setMediaProjection(mediaProjection);
             if (mediaProjection == null) {

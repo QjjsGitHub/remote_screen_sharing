@@ -144,13 +144,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private void initService() {
         recordScreenServiceConnection = new RecordScreenServiceConnection();
         Intent intent = new Intent(this, RecordScreenService.class);
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(intent);
-        } else {
-            startService(intent);
-        }
-
         bindService(intent, recordScreenServiceConnection, Context.BIND_AUTO_CREATE);
     }
 

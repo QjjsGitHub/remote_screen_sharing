@@ -67,6 +67,12 @@ public class MyEncoder extends Thread {
     private boolean createVirtualDisplay() {
         MediaProjection mediaProjection = MyApplication.getMediaProjection();
         if (mediaProjection != null) {
+            mediaProjection.registerCallback(new MediaProjection.Callback() {
+                @Override
+                public void onStop() {
+                    super.onStop();
+                }
+            }, null);
             mediaProjection.createVirtualDisplay("-display",
                     videoW, videoH, 420,
                     DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
