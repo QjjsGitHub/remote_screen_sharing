@@ -1,12 +1,12 @@
 package com.qjj.screenshare;
 
-import androidx.appcompat.app.AppCompatActivity;
-
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.content.pm.PackageManager;
 import android.media.projection.MediaProjectionManager;
 import android.net.Uri;
 import android.os.Build;
@@ -24,6 +24,11 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 import com.qjj.screenshare.entity.MessageEvent;
 import com.qjj.screenshare.services.RecordScreenService;
@@ -48,6 +53,7 @@ import static com.qjj.screenshare.MyApplication.*;
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
 
     private static final int REQUEST_MEDIA_PROJECTION = 11;
+    private static final int REQUEST_POST_NOTIFICATIONS = 12;
     private RecordScreenServiceConnection recordScreenServiceConnection = null;
     private RecordScreenService.MyBinder myBinder;
     private Button recordButton;
@@ -92,6 +98,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             height = dm.heightPixels;
         }
 
+        checkNotificationPermission();
+    }
+
+    private void checkNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQUEST_POST_NOTIFICATIONS);
+            }
+        }
     }
 
     /**
@@ -525,7 +540,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     @Override
     protected void onDestroy() {
-        myBinder.stopShare();
+        if (myBinder != null) {
+            myBinder.stopShare();
+        }
         if (recordScreenServiceConnection != null) {
             unbindService(recordScreenServiceConnection);
         }

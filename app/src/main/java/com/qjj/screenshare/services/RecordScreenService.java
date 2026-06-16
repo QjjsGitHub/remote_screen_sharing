@@ -7,6 +7,7 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ServiceInfo;
 import android.media.projection.MediaProjection;
 import android.os.Binder;
 import android.os.Build;
@@ -114,7 +115,7 @@ public class RecordScreenService extends Service {
                 .setSmallIcon(resId);
 
         Intent notifyIntent = new Intent(this, MainActivity.class);
-        PendingIntent notifyPendingIntent = PendingIntent.getActivity(this, 0, notifyIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+        PendingIntent notifyPendingIntent = PendingIntent.getActivity(this, 0, notifyIntent, PendingIntent.FLAG_MUTABLE);
         builder.setContentIntent(notifyPendingIntent);
 
         Notification notification = builder.build();
@@ -125,7 +126,11 @@ public class RecordScreenService extends Service {
         // 表明在点击了通知栏中的"清除通知"后，此通知不清除，经常与FLAG_ONGOING_EVENT一起使用
         notification.flags |= Notification.FLAG_NO_CLEAR;
 
-        startForeground(1, notification);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(1, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION);
+        } else {
+            startForeground(1, notification);
+        }
     }
 
     @Override
