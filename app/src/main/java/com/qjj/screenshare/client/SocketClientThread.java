@@ -5,10 +5,10 @@ import android.util.Log;
 import com.qjj.screenshare.entity.MessageEvent;
 import com.qjj.screenshare.MyApplication;
 import com.qjj.screenshare.entity.VideoPack;
-import com.qjj.screenshare.util.CombineValue;
 
 import org.greenrobot.eventbus.EventBus;
 
+import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -71,77 +71,29 @@ public class SocketClientThread extends Thread {
             try {
                 inputStream = client.getInputStream();
                 outputStream = client.getOutputStream();
-
-                int dataLength;
-                int crc;
-                long presentationTimeUs;
-                int type;
-                byte[] videoPack;
-
-                int length;
-                int lastLength = 0;
-
-                byte[] temp4 = new byte[4];
-                byte[] temp8 = new byte[8];
-
-                int headLength = 1024 * 50;
+                DataInputStream dis = new DataInputStream(inputStream);
 
                 while (!exit) {
-                    byte[] temp = new byte[headLength];
+                    int crc = dis.readInt();
+                    int dataLength = dis.readInt();
+                    long presentationTimeUs = dis.readLong();
+                    byte typeByte = dis.readByte();
+                    int type = (typeByte == TYPE1 ? 1 : 2);
 
-                    length = inputStream.read(temp);
-                    // Log.d("+++", "read: " + length);
+                    byte[] videoPack = new byte[dataLength];
+                    dis.readFully(videoPack); // 确保读取完整的数据包
 
-                    System.arraycopy(temp, 0, temp4, 0, 4);
-                    crc = CombineValue.bytesToInt(temp4);
-
-                    System.arraycopy(temp, 4, temp4, 0, 4);
-                    dataLength = CombineValue.bytesToInt(temp4);
-
-                    System.arraycopy(temp, 8, temp8, 0, 8);
-                    presentationTimeUs = CombineValue.bytesToLong(temp8);
-
-                    type = ((temp[16] == TYPE1) ? 1 : 2);
-
-                    videoPack = new byte[dataLength];
-
-                    if (length - 17 < dataLength) {
-                        System.arraycopy(temp, 17, videoPack, lastLength, length - 17);
-                        lastLength += length - 17;
-                        do {
-                            length = inputStream.read(temp);
-
-                            if (length + lastLength > dataLength) {
-                                System.arraycopy(temp, 0, videoPack, lastLength, dataLength - lastLength);
-                            } else {
-                                System.arraycopy(temp, 0, videoPack, lastLength, length);
-                            }
-                            //Log.d("+++", "read: " + length);
-                            lastLength += length;
-                        } while (lastLength < dataLength);
-                        lastLength = 0;
-                    } else {
-                        System.arraycopy(temp, 17, videoPack, 0, dataLength);
-                    }
-
-                    /*if (crc == CRC.getIntCRC(videoPack)) {*/
-                    if (true) {
-                        synchronized (linkedListVideo) {
-                            outputStream.write(CRC_OK);
-                            sumPack++;
-                            if (linkedListVideo.size() >= 24) {
-                                lostPack++;
-                                EventBus.getDefault().post(new MessageEvent(LOST_PACK, "client:" + lostPack * 100 / sumPack + "%"));
-                                linkedListVideo.removeLast();
-                            }
-                            VideoPack videoPack1 = new VideoPack(videoPack, type, presentationTimeUs);
-                            linkedListVideo.push(videoPack1);
+                    synchronized (linkedListVideo) {
+                        outputStream.write(CRC_OK);
+                        sumPack++;
+                        if (linkedListVideo.size() >= 24) {
+                            lostPack++;
+                            EventBus.getDefault().post(new MessageEvent(LOST_PACK, "client:" + lostPack * 100 / sumPack + "%"));
+                            linkedListVideo.removeLast();
                         }
-                    } else {
-                        Log.d("+++", "CRC_FAIL");
-                        outputStream.write(CRC_FAIL);
+                        VideoPack videoPack1 = new VideoPack(videoPack, type, presentationTimeUs);
+                        linkedListVideo.push(videoPack1);
                     }
-
                 }
             } catch (Throwable e) {
                 e.printStackTrace();

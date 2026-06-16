@@ -9,11 +9,12 @@ import android.view.Surface;
 
 import com.qjj.screenshare.entity.MessageEvent;
 import com.qjj.screenshare.MyApplication;
-import com.qjj.screenshare.util.ByteArrayPool;
-import com.qjj.screenshare.util.CombineValue;
 
 import org.greenrobot.eventbus.EventBus;
 
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
 
 import static com.qjj.screenshare.MyApplication.CODEC_CREATE_ERROE;
@@ -46,14 +47,14 @@ public class MyEncoder extends Thread {
     private static final String TAG = "Encoder";
     private static final String MIME = "Video/AVC";
 
-    private final SocketServerThread socketServerThread;
+    private final DataOutputStream dos;
 
-    public MyEncoder(SocketServerThread socketServerThread) {
+    public MyEncoder(OutputStream os) {
         this.videoW = MyApplication.width;
         this.videoH = MyApplication.height;
         this.videoBitrate = MyApplication.videoBitrate;
         this.videoFrameRate = MyApplication.videoFrameRate;
-        this.socketServerThread = socketServerThread;
+        this.dos = new DataOutputStream(os);
     }
 
     public boolean init() {
@@ -178,32 +179,15 @@ public class MyEncoder extends Thread {
     }
 
     private void onH264(byte[] buffer, int type, long ts) {
-        int length = buffer.length;
-        int totalLength = 4 + 4 + 8 + 1 + length;
-        byte[] bytes = ByteArrayPool.get(totalLength);
-
-        int offset = 0;
-
-        //CRC 四字节
-        /*System.arraycopy(CombineValue.intToByte(CRC.getIntCRC(buffer)), 0, bytes, offset, 4);*/
-        offset += 4;
-
-        //数据长度 四字节
-        System.arraycopy(CombineValue.intToByte(length), 0, bytes, offset, 4);
-        offset += 4;
-
-        //ts 八字节
-        System.arraycopy(CombineValue.longToBytes(ts), 0, bytes, offset, 8);
-        offset += 8;
-
-        //type
-        bytes[offset] = (type == 1) ? TYPE1 : TYPE2;
-        offset += 1;
-
-        System.arraycopy(buffer, 0, bytes, offset, buffer.length);
-
-        if (socketServerThread != null) {
-            socketServerThread.putVideoPack(bytes, totalLength);
+        try {
+            dos.writeInt(0); // CRC 占位
+            dos.writeInt(buffer.length);
+            dos.writeLong(ts);
+            dos.writeByte((type == 1) ? TYPE1 : TYPE2);
+            dos.write(buffer);
+            dos.flush();
+        } catch (IOException e) {
+            exit = true;
         }
     }
 }
