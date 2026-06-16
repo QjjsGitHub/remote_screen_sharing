@@ -70,22 +70,37 @@ public class SocketServerThread extends Thread {
 
             //客户端连接成功
             EventBus.getDefault().post(new MessageEvent(CLIENT_CONNECT));
+            
+            try {
+                socket.setTcpNoDelay(true); // 禁用 Nagle 算法，降低延迟
+                socket.setSendBufferSize(1024 * 1024); // 设置 1MB 发送缓冲区
+                outputStream = socket.getOutputStream();
+                inputStream = socket.getInputStream();
+            } catch (IOException e) {
+                EventBus.getDefault().post(new MessageEvent(CREATE_OUTPUT_STREAM_ERROR));
+                continue;
+            }
+
+            // 启动独立线程读取反馈，防止阻塞发送循环
+            new Thread(() -> {
+                byte[] result = new byte[1];
+                try {
+                    while (!exit && inputStream != null) {
+                        if (inputStream.read(result) == -1) break;
+                        if (result[0] == CRC_FAIL) {
+                            Log.d("---", "客户端反馈：CRC_FAIL");
+                        }
+                    }
+                } catch (IOException e) {
+                    Log.e("SocketServer", "读取反馈失败: " + e.getMessage());
+                }
+            }).start();
+
             //创建编码器
             myEncoder = new MyEncoder(this);
 
             if (myEncoder.init()) {
                 myEncoder.start();
-                //初始化编码器之后初始化服务输出流
-
-                try {
-                    outputStream = socket.getOutputStream();
-                    inputStream = socket.getInputStream();
-                } catch (IOException e) {
-                    if (!exit) {
-                        exit = true;
-                        EventBus.getDefault().post(new MessageEvent(CREATE_OUTPUT_STREAM_ERROR));
-                    }
-                }
             } else {
                 myEncoder.close();
                 myEncoder = null;
@@ -93,32 +108,25 @@ public class SocketServerThread extends Thread {
             }
 
             while (!exit) {
-
-                byte[] result = new byte[1];
                 VideoData videoData;
-
                 synchronized (linkedListVideo) {
                     if (linkedListVideo.size() <= 0) {
+                        try {
+                            linkedListVideo.wait(10); // 避免空转消耗 CPU
+                        } catch (InterruptedException e) {
+                            break;
+                        }
                         continue;
                     }
                     videoData = linkedListVideo.getLast();
                     linkedListVideo.removeLast();
                 }
+
                 if (!write(videoData.data, videoData.size)) {
                     ByteArrayPool.release(videoData.data);
                     break;
                 }
                 ByteArrayPool.release(videoData.data);
-
-                try {
-                    inputStream.read(result);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-
-                if (result[0] == CRC_FAIL) {
-                    Log.d("---", "CRC_FAIL");
-                }
             }
 
             try {
@@ -165,6 +173,7 @@ public class SocketServerThread extends Thread {
                 ByteArrayPool.release(removed.data);
             }
             linkedListVideo.push(new VideoData(videoPack, size));
+            linkedListVideo.notifyAll(); // 通知发送线程有新数据
         }
     }
 
