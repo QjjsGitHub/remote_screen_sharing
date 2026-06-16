@@ -5,6 +5,7 @@ import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
 import android.media.projection.MediaProjection;
+import android.os.Build;
 import android.view.Surface;
 
 import com.qjj.screenshare.entity.MessageEvent;
@@ -95,8 +96,16 @@ public class MyEncoder extends Thread {
             format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
             format.setInteger(MediaFormat.KEY_BIT_RATE, videoW * videoH * 2);
             format.setInteger(MediaFormat.KEY_FRAME_RATE, videoFrameRate);
+            // 关键帧间隔：1秒
             format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1);
-            format.setInteger(MediaFormat.KEY_LATENCY, 1);
+            // 极致优化：禁用 B 帧（B 帧会导致严重的编解码延迟）
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                format.setInteger(MediaFormat.KEY_MAX_B_FRAMES, 0);
+            }
+            // 优先级设置：设置为最高优先级（实时流任务）
+            format.setInteger(MediaFormat.KEY_PRIORITY, 0);
+            // 低延迟模式开关
+            format.setInteger(MediaFormat.KEY_LATENCY, 0);
             format.setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR);
 
             codec = MediaCodec.createEncoderByType(MIME);

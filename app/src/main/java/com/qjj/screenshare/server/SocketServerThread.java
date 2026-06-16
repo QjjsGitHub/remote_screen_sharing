@@ -2,6 +2,7 @@ package com.qjj.screenshare.server;
 
 import android.util.Log;
 
+import com.qjj.screenshare.MyApplication;
 import com.qjj.screenshare.entity.MessageEvent;
 
 import org.greenrobot.eventbus.EventBus;
@@ -67,6 +68,11 @@ public class SocketServerThread extends Thread {
                 OutputStream os = socket.getOutputStream();
                 InputStream is = socket.getInputStream();
                 dos = new DataOutputStream(os);
+
+                // 发送当前服务端的画面宽高给客户端
+                dos.writeInt(MyApplication.width);
+                dos.writeInt(MyApplication.height);
+                dos.flush();
 
                 // 将新客户端加入广播列表
                 clientStreams.add(dos);

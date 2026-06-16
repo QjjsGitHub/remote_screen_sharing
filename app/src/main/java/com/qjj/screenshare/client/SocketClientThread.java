@@ -68,6 +68,10 @@ public class SocketClientThread extends Thread {
                 // 使用 DataInputStream 简化大端字节序数据的解析
                 DataInputStream dis = new DataInputStream(inputStream);
 
+                // 首先读取服务端声明的画面宽高
+                int remoteWidth = dis.readInt();
+                int remoteHeight = dis.readInt();
+
                 while (!exit) {
                     // 1. 解析自定义协议头部（必须与服务端顺序完全一致）
                     dis.readInt(); // 读取并跳过 CRC 校验位 (4字节)
@@ -79,9 +83,9 @@ public class SocketClientThread extends Thread {
                     byte[] videoPack = new byte[dataLength];
                     dis.readFully(videoPack); // 阻塞读取，直到填满缓冲区
 
-                    // 3. 延迟初始化解码器
+                    // 3. 延迟初始化解码器，使用从服务端接收到的宽高
                     if (!hasInitVideo) {
-                        videoDecoder = new Decoder(MyApplication.width, MyApplication.height, MyApplication.videoFrameRate, MyApplication.getSurface());
+                        videoDecoder = new Decoder(remoteWidth, remoteHeight, MyApplication.videoFrameRate, MyApplication.getSurface());
                         if (videoDecoder.initDecoder()) {
                             hasInitVideo = true;
                         } else {

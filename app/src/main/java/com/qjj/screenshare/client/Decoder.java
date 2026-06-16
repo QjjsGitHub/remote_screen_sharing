@@ -39,6 +39,12 @@ public class Decoder {
         try {
             mCodec = MediaCodec.createDecoderByType(MIME_TYPE);
             MediaFormat mediaFormat = MediaFormat.createVideoFormat(MIME_TYPE, videoWidth, videoHeight);
+            
+            // 启用低延迟解码模式 (Android 11+)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                mediaFormat.setInteger(MediaFormat.KEY_LOW_LATENCY, 1);
+            }
+
             // 配置解码器，设置渲染 Surface
             mCodec.configure(mediaFormat, mSurface, null, 0);
             mCodec.start();
