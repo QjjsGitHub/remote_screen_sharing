@@ -55,11 +55,12 @@ import java.util.Enumeration;
 import static com.qjj.screenshare.MyApplication.*;
 
 /**
+ * 主界面类
+ * 负责权限申请、服务绑定、IP获取以及UI交互
  * @author 曲建金
  */
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
 
-    private static final int REQUEST_MEDIA_PROJECTION = 11;
     private static final int REQUEST_POST_NOTIFICATIONS = 12;
     private RecordScreenServiceConnection recordScreenServiceConnection = null;
     private RecordScreenService.MyBinder myBinder;
@@ -73,6 +74,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private boolean floatWindowIsShow = false;
     private SocketClientThread socketClientThread;
 
+    // 新版 Activity 结果启动器
     private ActivityResultLauncher<Intent> mediaProjectionLauncher;
     private ActivityResultLauncher<Intent> overlayPermissionLauncher;
 
@@ -84,30 +86,37 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        // 使用 modern 方式设置全屏
         WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
-        controller.hide(WindowInsetsCompat.Type.statusBars());
-        controller.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+        if (controller != null) {
+            controller.hide(WindowInsetsCompat.Type.statusBars());
+            controller.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+        }
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
 
         EventBus.getDefault().register(this);
 
-        initLaunchers();
+        initLaunchers(); // 初始化 Activity 结果监听
+        getWidthAndHeight(); // 获取屏幕分辨率和 DPI
 
-        getWidthAndHeight();
-
-        //初始化布局与监听
+        // 初始化布局与监听
         initView();
-        //初始化服务
+        // 初始化服务
         initService();
-        //显示本机ip地址
+        
+        // 显示本机 IP 地址
         String ip = getHostIP();
         localIpTextView.setText(ip);
         ipEditText.setText(ip);
 
-        checkNotificationPermission();
+        checkNotificationPermission(); // 检查通知权限（Android 13+）
     }
 
+    /**
+     * 初始化 Activity 结果启动器
+     */
     private void initLaunchers() {
+        // 屏幕捕捉授权结果监听
         mediaProjectionLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
                 result -> {
@@ -119,6 +128,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 }
         );
 
+        // 悬浮窗权限结果监听
         overlayPermissionLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
                 result -> {
@@ -129,15 +139,19 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         );
     }
 
+    /**
+     * 获取屏幕的分辨率和 DPI 信息
+     */
     private void getWidthAndHeight() {
-        //get screen width and height
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // Android 11+ 使用 WindowMetrics
             WindowMetrics windowMetrics = getWindowManager().getCurrentWindowMetrics();
             Rect bounds = windowMetrics.getBounds();
             width = bounds.width();
             height = bounds.height();
             screenDpi = getResources().getConfiguration().densityDpi;
         } else {
+            // 旧版本使用 DisplayMetrics
             WindowManager wm = (WindowManager) getApplicationContext().getSystemService(Context.WINDOW_SERVICE);
             DisplayMetrics dm = new DisplayMetrics();
             if (null != wm) {
@@ -149,6 +163,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
     }
 
+    /**
+     * 检查并请求通知权限
+     */
     private void checkNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
@@ -158,37 +175,37 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     /**
-     * 获取ip地址
-     *
+     * 获取本机 IPv4 地址
      * @return ip地址
      */
     public String getHostIP() {
-
         String hostIp = "";
         try {
             Enumeration<NetworkInterface> enumeration = NetworkInterface.getNetworkInterfaces();
-            InetAddress inetAddress;
             while (enumeration.hasMoreElements()) {
-                NetworkInterface networkInterface = (NetworkInterface) enumeration.nextElement();
+                NetworkInterface networkInterface = enumeration.nextElement();
                 Enumeration<InetAddress> inetAddressEnumeration = networkInterface.getInetAddresses();
                 while (inetAddressEnumeration.hasMoreElements()) {
-                    inetAddress = inetAddressEnumeration.nextElement();
+                    InetAddress inetAddress = inetAddressEnumeration.nextElement();
                     if (inetAddress instanceof Inet6Address) {
-                        continue;// skip ipv6
+                        continue; // 跳过 IPv6
                     }
                     String ip = inetAddress.getHostAddress();
                     if (!"127.0.0.1".equals(ip)) {
-                        hostIp = inetAddress.getHostAddress();
+                        hostIp = ip;
                         break;
                     }
                 }
             }
         } catch (SocketException e) {
-            Log.d("error", e.toString());
+            Log.e("MainActivity", "获取IP失败", e);
         }
         return hostIp;
     }
 
+    /**
+     * 初始化后台录屏服务
+     */
     private void initService() {
         recordScreenServiceConnection = new RecordScreenServiceConnection();
         Intent intent = new Intent(this, RecordScreenService.class);
@@ -196,7 +213,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     /**
-     * 初始化布局
+     * 初始化视图控件
      */
     private void initView() {
         recordButton = findViewById(R.id.button);
@@ -212,30 +229,27 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     /**
-     * 初始化悬浮框布局
+     * 初始化悬浮窗参数
      */
     @SuppressLint("InflateParams")
     private void initLayoutParams() {
-        //申请权限
+        // 检查悬浮窗权限
         if (!Settings.canDrawOverlays(this)) {
             Toast.makeText(MainActivity.this, "当前无权限，请授权", Toast.LENGTH_SHORT).show();
             overlayPermissionLauncher.launch(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName())));
         }
 
-        //获取窗口管理器
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
-        //初始化窗口布局
         layoutParams = new WindowManager.LayoutParams();
         layoutParams.type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
-        //layoutParams.format = PixelFormat.RGBA_8888;
-        //layoutParams.gravity = Gravity.CENTER;
         layoutParams.flags = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
         layoutParams.width = width / 2;
         layoutParams.height = height / 2;
         layoutParams.x = 0;
         layoutParams.y = 0;
-        //初始化悬浮框
+
         LayoutInflater layoutInflater = LayoutInflater.from(this);
+        // 悬浮窗没有父布局，此处传 null 是正常的
         displayView = layoutInflater.inflate(R.layout.float_display, null);
         displayView.setOnTouchListener(new FloatingOnTouchListener());
 
@@ -245,7 +259,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     /**
-     * 关闭悬浮框
+     * 关闭悬浮窗
      */
     private void dismassFloatWindow() {
         if (floatWindowIsShow) {
@@ -255,15 +269,17 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     /**
-     * 显示悬浮框
+     * 显示悬浮窗
      */
     private void showFloatingWindow() {
-        floatWindowIsShow = true;
-        windowManager.addView(displayView, layoutParams);
+        if (!floatWindowIsShow) {
+            floatWindowIsShow = true;
+            windowManager.addView(displayView, layoutParams);
+        }
     }
 
     /**
-     * 悬浮框触摸移动监听
+     * 悬浮窗触摸拖动监听
      */
     private class FloatingOnTouchListener implements View.OnTouchListener {
         private int x;
@@ -274,7 +290,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             switch (event.getAction()) {
                 case MotionEvent.ACTION_DOWN:
                     if (System.currentTimeMillis() - lastClickTime < 200) {
-                        setFloatWindowSize(view);
+                        setFloatWindowSize(view); // 双击切换大小
                     } else {
                         lastClickTime = System.currentTimeMillis();
                     }
@@ -288,8 +304,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     int movey = nowy - y;
                     x = nowx;
                     y = nowy;
-                    layoutParams.x = layoutParams.x + movex;
-                    layoutParams.y = layoutParams.y + movey;
+                    layoutParams.x += movex;
+                    layoutParams.y += movey;
                     windowManager.updateViewLayout(view, layoutParams);
                     break;
                 default:
@@ -300,6 +316,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
     }
 
+    /**
+     * 循环切换悬浮窗显示比例
+     */
     private void setFloatWindowSize(View view) {
         switch (screenSize) {
             case 1:
@@ -329,13 +348,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     /**
-     * 捕捉屏幕
+     * 启动屏幕捕捉授权
      */
     private void captureScreen() {
-        //5.0 之后才允许使用屏幕截图
         if (mediaProjectionManager == null) {
-            mediaProjectionManager = (MediaProjectionManager) getSystemService(
-                    Context.MEDIA_PROJECTION_SERVICE);
+            mediaProjectionManager = (MediaProjectionManager) getSystemService(Context.MEDIA_PROJECTION_SERVICE);
         }
         if (null == mediaProjectionManager) {
             recordButton.setEnabled(false);
@@ -345,15 +362,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         mediaProjectionLauncher.launch(mediaProjectionManager.createScreenCaptureIntent());
     }
 
-    /**
-     * 按键点击事件
-     *
-     * @param v 点击视图
-     */
     @Override
     public void onClick(View v) {
         int id = v.getId();
         if (id == R.id.button) {
+            // 服务端：启动/停止 屏幕共享
             if ("开启".equals(recordButton.getText().toString())) {
                 recordButton.setEnabled(false);
                 captureScreen();
@@ -362,6 +375,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 recordScreenServiceConnection.stopShare();
             }
         } else if (id == R.id.button2) {
+            // 客户端：连接/断开 远程屏幕
             if ("播放".equals(playButton.getText().toString())) {
                 playButton.setEnabled(false);
                 String string = ipEditText.getText().toString();
@@ -373,15 +387,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 }
             } else {
                 updateClientState(false);
-                socketClientThread.exit();
+                if (socketClientThread != null) {
+                    socketClientThread.exit();
+                }
             }
         }
     }
 
     /**
-     * 处理EventBUS事件
-     *
-     * @param messageEvent 事件对象
+     * 处理 EventBus 事件回调（UI 线程）
      */
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void event(MessageEvent messageEvent) {
@@ -504,9 +518,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
     }
 
-
     /**
-     * 录屏服务连接
+     * 录屏服务连接回调
      */
     private class RecordScreenServiceConnection implements ServiceConnection {
 
