@@ -303,33 +303,29 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
      */
     @Override
     public void onClick(View v) {
-        switch (v.getId()) {
-            case R.id.button:
-                if ("开启".equals(recordButton.getText().toString())) {
-                    recordButton.setEnabled(false);
-                    captureScreen();
+        int id = v.getId();
+        if (id == R.id.button) {
+            if ("开启".equals(recordButton.getText().toString())) {
+                recordButton.setEnabled(false);
+                captureScreen();
+            } else {
+                recordButton.setEnabled(false);
+                recordScreenServiceConnection.stopShare();
+            }
+        } else if (id == R.id.button2) {
+            if ("播放".equals(playButton.getText().toString())) {
+                playButton.setEnabled(false);
+                String string = ipEditText.getText().toString();
+                if (string.length() <= 0) {
+                    EventBus.getDefault().post(new MessageEvent(IP_IS_NULL));
                 } else {
-                    recordButton.setEnabled(false);
-                    recordScreenServiceConnection.stopShare();
-                }
-                break;
-            case R.id.button2:
-                if ("播放".equals(playButton.getText().toString())) {
-                    playButton.setEnabled(false);
-                    String string = ipEditText.getText().toString();
-                    if (string.length() <= 0) {
-                        EventBus.getDefault().post(new MessageEvent(IP_IS_NULL));
-                        break;
-                    }
                     socketClientThread = new SocketClientThread(string);
                     socketClientThread.start();
-                } else {
-                    updateClientState(false);
-                    socketClientThread.exit();
                 }
-                break;
-            default:
-                break;
+            } else {
+                updateClientState(false);
+                socketClientThread.exit();
+            }
         }
     }
 
