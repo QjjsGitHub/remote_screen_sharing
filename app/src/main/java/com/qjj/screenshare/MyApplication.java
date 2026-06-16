@@ -53,6 +53,7 @@ public class MyApplication extends Application {
 
     public static int width = 1080;
     public static int height = 1920;
+    public static int screenDpi = 420;
     public static int videoBitrate = width * height * 4;
     public static int videoFrameRate = 24;
 

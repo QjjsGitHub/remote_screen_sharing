@@ -9,8 +9,7 @@ import android.view.Surface;
 
 import com.qjj.screenshare.entity.MessageEvent;
 import com.qjj.screenshare.MyApplication;
-import com.qjj.screenshare.util.CRC;
-import com.qjj.screenshare.util.CombinValue;
+import com.qjj.screenshare.util.CombineValue;
 
 import org.greenrobot.eventbus.EventBus;
 
@@ -22,7 +21,6 @@ import static com.qjj.screenshare.MyApplication.CODEC_SERVER_RUN;
 import static com.qjj.screenshare.MyApplication.MEDIA_PROJECTION_IS_NULL;
 import static com.qjj.screenshare.MyApplication.TYPE1;
 import static com.qjj.screenshare.MyApplication.TYPE2;
-import static com.qjj.screenshare.MyApplication.width;
 
 /**
  * 创建日期：2019/11/21 11:46
@@ -73,8 +71,9 @@ public class MyEncoder extends Thread {
                     super.onStop();
                 }
             }, null);
+            
             mediaProjection.createVirtualDisplay("-display",
-                    videoW, videoH, 420,
+                    videoW, videoH, MyApplication.screenDpi,
                     DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
                     mSurface, null, null);
         } else {
@@ -142,7 +141,7 @@ public class MyEncoder extends Thread {
                     }
                     outputBuffer.get(outData);
                     if (mBufferInfo.flags == 2) {
-                        configbyte = new byte[mBufferInfo.size];
+                        //configbyte = new byte[mBufferInfo.size];
                         configbyte = outData;
                     } else if (mBufferInfo.flags == 1) {
                         byte[] keyframe = new byte[mBufferInfo.size + configbyte.length];
@@ -184,15 +183,15 @@ public class MyEncoder extends Thread {
         int offset = 0;
 
         //CRC 四字节
-        /*System.arraycopy(CombinValue.intToByte(CRC.getIntCRC(buffer)), 0, bytes, offset, 4);*/
+        /*System.arraycopy(CombineValue.intToByte(CRC.getIntCRC(buffer)), 0, bytes, offset, 4);*/
         offset += 4;
 
         //数据长度 四字节
-        System.arraycopy(CombinValue.intToByte(length), 0, bytes, offset, 4);
+        System.arraycopy(CombineValue.intToByte(length), 0, bytes, offset, 4);
         offset += 4;
 
         //ts 八字节
-        System.arraycopy(CombinValue.longToBytes(ts), 0, bytes, offset, 8);
+        System.arraycopy(CombineValue.longToBytes(ts), 0, bytes, offset, 8);
         offset += 8;
 
         //type

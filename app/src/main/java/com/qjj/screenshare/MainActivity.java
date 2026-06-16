@@ -7,6 +7,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
+import android.graphics.Rect;
 import android.media.projection.MediaProjectionManager;
 import android.net.Uri;
 import android.os.Build;
@@ -14,21 +15,27 @@ import android.os.Bundle;
 import android.os.IBinder;
 import android.provider.Settings;
 import android.util.DisplayMetrics;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.SurfaceView;
 import android.view.View;
 import android.view.WindowManager;
+import android.view.WindowMetrics;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.annotation.NonNull;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 
 import com.qjj.screenshare.entity.MessageEvent;
 import com.qjj.screenshare.services.RecordScreenService;
@@ -66,6 +73,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private boolean floatWindowIsShow = false;
     private SocketClientThread socketClientThread;
 
+    private ActivityResultLauncher<Intent> mediaProjectionLauncher;
+    private ActivityResultLauncher<Intent> overlayPermissionLauncher;
+
     private long lastClickTime = 0;
     private short screenSize = 2;
 
@@ -74,12 +84,17 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        WindowManager.LayoutParams lp = getWindow().getAttributes();
-        lp.flags |= WindowManager.LayoutParams.FLAG_FULLSCREEN;
-        getWindow().setAttributes(lp);
+        WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
+        controller.hide(WindowInsetsCompat.Type.statusBars());
+        controller.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
 
         EventBus.getDefault().register(this);
+
+        initLaunchers();
+
+        getWidthAndHeight();
+
         //初始化布局与监听
         initView();
         //初始化服务
@@ -89,16 +104,49 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         localIpTextView.setText(ip);
         ipEditText.setText(ip);
 
-        //get screen width and height
-        WindowManager wm = (WindowManager) getApplicationContext().getSystemService(Context.WINDOW_SERVICE);
-        DisplayMetrics dm = new DisplayMetrics();
-        if (null != wm) {
-            wm.getDefaultDisplay().getMetrics(dm);
-            width = dm.widthPixels;
-            height = dm.heightPixels;
-        }
-
         checkNotificationPermission();
+    }
+
+    private void initLaunchers() {
+        mediaProjectionLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                result -> {
+                    if (result.getResultCode() == RESULT_OK && result.getData() != null) {
+                        recordScreenServiceConnection.startShare(result.getResultCode(), result.getData());
+                    } else {
+                        EventBus.getDefault().post(new MessageEvent(REQUEST_MEDIA_PROJECTION_FAIL));
+                    }
+                }
+        );
+
+        overlayPermissionLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                result -> {
+                    if (!Settings.canDrawOverlays(this)) {
+                        Toast.makeText(MainActivity.this, "未获得悬浮窗权限", Toast.LENGTH_SHORT).show();
+                    }
+                }
+        );
+    }
+
+    private void getWidthAndHeight() {
+        //get screen width and height
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            WindowMetrics windowMetrics = getWindowManager().getCurrentWindowMetrics();
+            Rect bounds = windowMetrics.getBounds();
+            width = bounds.width();
+            height = bounds.height();
+            screenDpi = getResources().getConfiguration().densityDpi;
+        } else {
+            WindowManager wm = (WindowManager) getApplicationContext().getSystemService(Context.WINDOW_SERVICE);
+            DisplayMetrics dm = new DisplayMetrics();
+            if (null != wm) {
+                wm.getDefaultDisplay().getMetrics(dm);
+                width = dm.widthPixels;
+                height = dm.heightPixels;
+                screenDpi = dm.densityDpi;
+            }
+        }
     }
 
     private void checkNotificationPermission() {
@@ -118,7 +166,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         String hostIp = "";
         try {
-            Enumeration enumeration = NetworkInterface.getNetworkInterfaces();
+            Enumeration<NetworkInterface> enumeration = NetworkInterface.getNetworkInterfaces();
             InetAddress inetAddress;
             while (enumeration.hasMoreElements()) {
                 NetworkInterface networkInterface = (NetworkInterface) enumeration.nextElement();
@@ -136,7 +184,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 }
             }
         } catch (SocketException e) {
-            e.printStackTrace();
+            Log.d("error", e.toString());
         }
         return hostIp;
     }
@@ -169,22 +217,16 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     @SuppressLint("InflateParams")
     private void initLayoutParams() {
         //申请权限
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (!Settings.canDrawOverlays(this)) {
-                Toast.makeText(MainActivity.this, "当前无权限，请授权", Toast.LENGTH_SHORT).show();
-                startActivityForResult(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName())), 2);
-            }
+        if (!Settings.canDrawOverlays(this)) {
+            Toast.makeText(MainActivity.this, "当前无权限，请授权", Toast.LENGTH_SHORT).show();
+            overlayPermissionLauncher.launch(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName())));
         }
 
         //获取窗口管理器
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         //初始化窗口布局
         layoutParams = new WindowManager.LayoutParams();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            layoutParams.type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
-        } else {
-            layoutParams.type = WindowManager.LayoutParams.TYPE_PHONE;
-        }
+        layoutParams.type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
         //layoutParams.format = PixelFormat.RGBA_8888;
         //layoutParams.gravity = Gravity.CENTER;
         layoutParams.flags = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
@@ -300,8 +342,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             Toast.makeText(this, "无法录屏，请确认授权录屏", Toast.LENGTH_SHORT).show();
             return;
         }
-        startActivityForResult(mediaProjectionManager.createScreenCaptureIntent(),
-                REQUEST_MEDIA_PROJECTION);
+        mediaProjectionLauncher.launch(mediaProjectionManager.createScreenCaptureIntent());
     }
 
     /**
@@ -463,26 +504,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
     }
 
-
-    /**
-     * 接收请求录屏服务反馈
-     *
-     * @param requestCode 请求码
-     * @param resultCode  返回码
-     * @param data        数据
-     */
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == REQUEST_MEDIA_PROJECTION) {
-            if (resultCode == RESULT_OK && data != null) {
-                recordScreenServiceConnection.startShare(resultCode, data);
-            } else {
-                EventBus.getDefault().post(new MessageEvent(REQUEST_MEDIA_PROJECTION_FAIL));
-            }
-        }
-
-    }
 
     /**
      * 录屏服务连接

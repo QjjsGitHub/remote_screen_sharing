@@ -1,6 +1,6 @@
 package com.qjj.screenshare.util;
 
-public class CombinValue {
+public class CombineValue {
     public static byte[] shortToByte(short value){
         byte[] src = new byte[2];
         src[1] =  (byte) ((value>>>8) & 0xFF);
@@ -35,23 +35,23 @@ public class CombinValue {
     public static short bytesToShort(byte[] bytes){
         short src = 0;
         for (int i = 0; i < bytes.length; i++) {
-            long tmp = ((long) bytes[i] & 0xffl);
-            src |= (tmp<<i*8);
+            long tmp = ((long) bytes[i] & 0xffL);
+            src |= (short) (tmp<<i*8);
         }
         return src;
     }
     public static int bytesToInt(byte[] bytes){
         int src = 0;
         for (int i = 0; i < bytes.length; i++) {
-            long tmp = ((long) bytes[i] & 0xffl);
-            src |= (tmp<<i*8);
+            long tmp = ((long) bytes[i] & 0xffL);
+            src |= (int) (tmp<<i*8);
         }
         return src;
     }
     public static long bytesToLong(byte[] bytes){
         long src = 0;
         for (int i = 0; i < bytes.length; i++) {
-            long tmp = ((long) bytes[i] & 0xffl);
+            long tmp = ((long) bytes[i] & 0xffL);
             src |= (tmp<<i*8);
         }
         return src;
@@ -72,14 +72,14 @@ public class CombinValue {
      * @return  转换后的Hex字符串
      */
     public static String bytesToHex(byte[] bytes, String splie) {
-        StringBuffer sb = new StringBuffer();
+        StringBuilder sb = new StringBuilder();
         for(int i = 0; i < bytes.length; i++) {
             String hex = Integer.toHexString(bytes[i] & 0xFF);
             if(hex.length() < 2){
                 sb.append(0);
             }
             if (i!=bytes.length-1) {
-                sb.append(hex+splie);
+                sb.append(hex).append(splie);
             }else {
                 sb.append(hex);
             }

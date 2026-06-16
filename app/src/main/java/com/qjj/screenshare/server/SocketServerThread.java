@@ -30,9 +30,7 @@ public class SocketServerThread extends Thread {
     private OutputStream outputStream = null;
     private InputStream inputStream = null;
 
-    private LinkedList<byte[]> linkedListVideo = new LinkedList<>();
-
-    private Socket socket;
+    private final LinkedList<byte[]> linkedListVideo = new LinkedList<>();
 
     private int sendDataError = 0;
 
@@ -52,6 +50,7 @@ public class SocketServerThread extends Thread {
             //客户端连接成功
             EventBus.getDefault().post(new MessageEvent(WAIT_CONNECT));
 
+            Socket socket;
             try {
                 socket = serverSocket.accept();
             } catch (IOException e) {

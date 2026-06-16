@@ -5,14 +5,11 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
-import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ServiceInfo;
-import android.media.projection.MediaProjection;
 import android.os.Binder;
 import android.os.Build;
 import android.os.IBinder;
-import android.util.Log;
 
 import androidx.core.app.NotificationCompat;
 
@@ -55,9 +52,8 @@ public class RecordScreenService extends Service {
     public class MyBinder extends Binder {
 
         public void startShare(int resultCode, Intent data) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                buildNotification(R.mipmap.ic_launcher, "屏幕分享", "正在分享屏幕");
-            }
+            buildNotification(R.mipmap.ic_launcher, "屏幕分享", "正在分享屏幕");
+
             mediaProjection = mediaProjectionManager.getMediaProjection(resultCode, data);
             MyApplication.setMediaProjection(mediaProjection);
             if (mediaProjection == null) {
@@ -79,30 +75,26 @@ public class RecordScreenService extends Service {
         }
     }
 
-    private boolean initNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            //创建通知渠道
-            CharSequence name = "运行通知";
-            String description = "服务运行中";
-            //重要性级别
-            int importance = NotificationManager.IMPORTANCE_DEFAULT;
+    private void initNotificationChannel() {
+        //创建通知渠道
+        CharSequence name = "运行通知";
+        String description = "服务运行中";
+        //重要性级别
+        int importance = NotificationManager.IMPORTANCE_DEFAULT;
 
-            NotificationChannel mChannel = new NotificationChannel(UNLOCK_NOTIFICATION_CHANNEL_ID, name, importance);
-            //渠道描述
-            mChannel.setDescription(description);
-            //是否显示通知指示灯
-            mChannel.enableLights(false);
-            //是否振动
-            mChannel.enableVibration(false);
+        NotificationChannel mChannel = new NotificationChannel(UNLOCK_NOTIFICATION_CHANNEL_ID, name, importance);
+        //渠道描述
+        mChannel.setDescription(description);
+        //是否显示通知指示灯
+        mChannel.enableLights(false);
+        //是否振动
+        mChannel.enableVibration(false);
 
-            NotificationManager notificationManager = (NotificationManager) getApplicationContext().getSystemService(NOTIFICATION_SERVICE);
-            //创建通知渠道
-            if (notificationManager != null) {
-                notificationManager.createNotificationChannel(mChannel);
-                return true;
-            }
+        NotificationManager notificationManager = (NotificationManager) getApplicationContext().getSystemService(NOTIFICATION_SERVICE);
+        //创建通知渠道
+        if (notificationManager != null) {
+            notificationManager.createNotificationChannel(mChannel);
         }
-        return false;
     }
 
     private void buildNotification(int resId, String title, String contenttext) {

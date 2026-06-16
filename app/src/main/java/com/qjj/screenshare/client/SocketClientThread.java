@@ -5,8 +5,7 @@ import android.util.Log;
 import com.qjj.screenshare.entity.MessageEvent;
 import com.qjj.screenshare.MyApplication;
 import com.qjj.screenshare.entity.VideoPack;
-import com.qjj.screenshare.util.CRC;
-import com.qjj.screenshare.util.CombinValue;
+import com.qjj.screenshare.util.CombineValue;
 
 import org.greenrobot.eventbus.EventBus;
 
@@ -26,7 +25,6 @@ import static com.qjj.screenshare.MyApplication.CRC_OK;
 import static com.qjj.screenshare.MyApplication.LOST_PACK;
 import static com.qjj.screenshare.MyApplication.RECEIVE_DATA_ERROR;
 import static com.qjj.screenshare.MyApplication.TYPE1;
-import static com.qjj.screenshare.MyApplication.width;
 
 /**
  * @author 曲建金
@@ -95,13 +93,13 @@ public class SocketClientThread extends Thread {
                     // Log.d("+++", "read: " + length);
 
                     System.arraycopy(temp, 0, temp4, 0, 4);
-                    crc = CombinValue.bytesToInt(temp4);
+                    crc = CombineValue.bytesToInt(temp4);
 
                     System.arraycopy(temp, 4, temp4, 0, 4);
-                    dataLength = CombinValue.bytesToInt(temp4);
+                    dataLength = CombineValue.bytesToInt(temp4);
 
                     System.arraycopy(temp, 8, temp8, 0, 8);
-                    presentationTimeUs = CombinValue.bytesToLong(temp8);
+                    presentationTimeUs = CombineValue.bytesToLong(temp8);
 
                     type = ((temp[16] == TYPE1) ? 1 : 2);
 
