@@ -2,7 +2,6 @@ package com.qjj.screenshare.client;
 
 import com.qjj.screenshare.entity.MessageEvent;
 import com.qjj.screenshare.MyApplication;
-import com.qjj.screenshare.server.Decoder;
 
 import org.greenrobot.eventbus.EventBus;
 
@@ -24,18 +23,18 @@ import static com.qjj.screenshare.MyApplication.RECEIVE_DATA_ERROR;
 /**
  * 客户端连接与接收线程
  * 负责连接远程服务端，接收并解析视频数据流，直接调用解码器渲染
+ *
  * @author 曲建金
  */
 public class SocketClientThread extends Thread {
 
     private Socket client;
     private boolean exit = false;
-    private SocketAddress socketAddress;
     private InputStream inputStream;
     private OutputStream outputStream;
     private Decoder videoDecoder;
     private boolean hasInitVideo = false;
-    private String ip = "";
+    private final String ip;
 
     public SocketClientThread(String ip) {
         this.ip = ip;
@@ -46,7 +45,7 @@ public class SocketClientThread extends Thread {
      */
     public void connect() {
         client = new Socket();
-        socketAddress = new InetSocketAddress(ip, 9900);
+        SocketAddress socketAddress = new InetSocketAddress(ip, 9900);
         try {
             client.connect(socketAddress, 5000); // 设置 5 秒连接超时
         } catch (IOException e) {
@@ -65,16 +64,14 @@ public class SocketClientThread extends Thread {
 
             try {
                 inputStream = client.getInputStream();
-                outputStream = client.getOutputStream();
                 // 使用 DataInputStream 简化大端字节序数据的解析
                 DataInputStream dis = new DataInputStream(inputStream);
 
                 while (!exit) {
-                    // 1. 解析自定义协议头部
-                    dis.readInt(); // 读取并跳过 CRC 校验位（暂未校验）
+
                     int dataLength = dis.readInt(); // 获取当前帧的有效负载长度
                     long presentationTimeUs = dis.readLong(); // 获取呈现时间戳
-                    dis.readByte(); // 读取并跳过帧类型标识
+
 
                     // 2. 稳定读取完整的帧数据内容
                     byte[] videoPack = new byte[dataLength];
@@ -91,12 +88,9 @@ public class SocketClientThread extends Thread {
                     }
 
                     // 4. 将接收到的 H.264 数据送入解码器
-                    if (hasInitVideo) {
-                        videoDecoder.onFrame(videoPack, 0, dataLength, presentationTimeUs);
-                    }
+                    videoDecoder.onFrame(videoPack, 0, dataLength, presentationTimeUs);
 
-                    // 5. 向服务端回复 ACK 确认（可选的心跳机制）
-                    outputStream.write(CRC_OK);
+
                 }
             } catch (Throwable e) {
                 if (!exit) {
@@ -114,11 +108,18 @@ public class SocketClientThread extends Thread {
     public void exit() {
         exit = true;
         try {
-            if (inputStream != null) inputStream.close();
-            if (outputStream != null) outputStream.close();
-            if (client != null) client.close();
-        } catch (Throwable ignored) {}
-        
+            if (inputStream != null) {
+                inputStream.close();
+            }
+            if (outputStream != null) {
+                outputStream.close();
+            }
+            if (client != null) {
+                client.close();
+            }
+        } catch (Throwable ignored) {
+        }
+
         if (videoDecoder != null) {
             videoDecoder.release();
         }

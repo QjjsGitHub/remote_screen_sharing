@@ -14,7 +14,7 @@ import org.greenrobot.eventbus.EventBus;
 
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
+import java.util.List;
 import java.nio.ByteBuffer;
 
 import static com.qjj.screenshare.MyApplication.CODEC_CREATE_ERROE;
@@ -26,7 +26,7 @@ import static com.qjj.screenshare.MyApplication.TYPE2;
 
 /**
  * 屏幕编码线程类
- * 负责获取 MediaProjection 内容，通过 MediaCodec 编码为 H.264，并直接写入网络输出流
+ * 负责获取 MediaProjection 内容，通过 MediaCodec 编码为 H.264，并广播给所有已连接的客户端
  */
 public class MyEncoder extends Thread {
 
@@ -42,13 +42,13 @@ public class MyEncoder extends Thread {
     private boolean exit = false;
 
     private static final String MIME = "Video/AVC"; // H.264 编码格式
-    private final DataOutputStream dos; // 封装后的网络输出流
+    private final List<DataOutputStream> clientStreams; // 客户端流列表（用于广播）
 
-    public MyEncoder(OutputStream os) {
+    public MyEncoder(List<DataOutputStream> clientStreams) {
         this.videoW = MyApplication.width;
         this.videoH = MyApplication.height;
         this.videoFrameRate = MyApplication.videoFrameRate;
-        this.dos = new DataOutputStream(os);
+        this.clientStreams = clientStreams;
     }
 
     /**
@@ -92,21 +92,16 @@ public class MyEncoder extends Thread {
     private boolean initMediaCodec() {
         try {
             MediaFormat format = MediaFormat.createVideoFormat(MIME, videoW, videoH);
-            // 颜色格式：使用 Surface 作为输入
             format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
-            // 码率设置
             format.setInteger(MediaFormat.KEY_BIT_RATE, videoW * videoH * 2);
-            // 帧率
             format.setInteger(MediaFormat.KEY_FRAME_RATE, videoFrameRate);
-            // 关键帧间隔：1秒
             format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1);
-            // 低延迟配置
             format.setInteger(MediaFormat.KEY_LATENCY, 1);
             format.setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR);
 
             codec = MediaCodec.createEncoderByType(MIME);
             codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
-            mSurface = codec.createInputSurface(); // 创建输入 Surface
+            mSurface = codec.createInputSurface();
             codec.start();
         } catch (Exception e) {
             EventBus.getDefault().post(new MessageEvent(CODEC_CREATE_ERROE));
@@ -127,7 +122,6 @@ public class MyEncoder extends Thread {
                 }
 
                 MediaCodec.BufferInfo mBufferInfo = new MediaCodec.BufferInfo();
-                // 取出编码后的数据索引
                 int outputBufferIndex = codec.dequeueOutputBuffer(mBufferInfo, TIMEOUT_USEC);
 
                 while (outputBufferIndex >= 0) {
@@ -137,10 +131,8 @@ public class MyEncoder extends Thread {
                         outputBuffer.get(outData);
 
                         if (mBufferInfo.flags == MediaCodec.BUFFER_FLAG_CODEC_CONFIG) {
-                            // 保存 SPS/PPS 参数，后续拼接到关键帧前
                             configbyte = outData;
                         } else if (mBufferInfo.flags == MediaCodec.BUFFER_FLAG_KEY_FRAME) {
-                            // 关键帧：拼接参数后再发送，确保接收端可随时解码
                             byte[] keyframe = new byte[mBufferInfo.size + (configbyte != null ? configbyte.length : 0)];
                             if (configbyte != null) {
                                 System.arraycopy(configbyte, 0, keyframe, 0, configbyte.length);
@@ -148,10 +140,9 @@ public class MyEncoder extends Thread {
                             } else {
                                 System.arraycopy(outData, 0, keyframe, 0, outData.length);
                             }
-                            onH264(keyframe, 1, mBufferInfo.presentationTimeUs);
+                            broadcastH264(keyframe, 1, mBufferInfo.presentationTimeUs);
                         } else {
-                            // 普通帧
-                            onH264(outData, 2, mBufferInfo.presentationTimeUs);
+                            broadcastH264(outData, 2, mBufferInfo.presentationTimeUs);
                         }
                     }
                     codec.releaseOutputBuffer(outputBufferIndex, false);
@@ -182,19 +173,20 @@ public class MyEncoder extends Thread {
     }
 
     /**
-     * 数据协议封装并发送
-     * 格式：[4字节CRC][4字节长度][8字节时间戳][1字节类型][有效负载数据]
+     * 广播 H264 数据给所有客户端
      */
-    private void onH264(byte[] buffer, int type, long ts) {
-        try {
-            dos.writeInt(0); // CRC 占位，暂未实现
-            dos.writeInt(buffer.length); // 有效数据长度
-            dos.writeLong(ts); // 呈现时间戳
-            dos.writeByte((type == 1) ? TYPE1 : TYPE2); // 帧类型标识
-            dos.write(buffer); // 写入原始 H.264 字节
-            dos.flush();
-        } catch (IOException e) {
-            exit = true; // 发送失败通常意味着连接已断开
+    private void broadcastH264(byte[] buffer, int type, long ts) {
+        for (DataOutputStream dos : clientStreams) {
+            try {
+                dos.writeInt(0); // CRC 占位
+                dos.writeInt(buffer.length);
+                dos.writeLong(ts);
+                dos.writeByte((type == 1) ? TYPE1 : TYPE2);
+                dos.write(buffer);
+                dos.flush();
+            } catch (IOException e) {
+                // 发送失败的客户端由 SocketServerThread 负责清理
+            }
         }
     }
 }

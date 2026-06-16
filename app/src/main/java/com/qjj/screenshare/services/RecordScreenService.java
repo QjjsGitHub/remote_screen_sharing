@@ -52,6 +52,9 @@ public class RecordScreenService extends Service {
     public class MyBinder extends Binder {
 
         public void startShare(int resultCode, Intent data) {
+            if (socketServerThread != null && socketServerThread.isAlive()) {
+                return; // 防止重复启动
+            }
             buildNotification(R.mipmap.ic_launcher, "屏幕分享", "正在分享屏幕");
 
             mediaProjection = mediaProjectionManager.getMediaProjection(resultCode, data);
@@ -126,6 +129,10 @@ public class RecordScreenService extends Service {
 
     @Override
     public void onDestroy() {
+        if (myBinder != null) {
+            myBinder.stopShare();
+        }
+        stopForeground(true);
         super.onDestroy();
     }
 }

@@ -57,6 +57,7 @@ import static com.qjj.screenshare.MyApplication.*;
 /**
  * 主界面类
  * 负责权限申请、服务绑定、IP获取以及UI交互
+ *
  * @author 曲建金
  */
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
@@ -88,10 +89,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         // 使用 modern 方式设置全屏
         WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
-        if (controller != null) {
-            controller.hide(WindowInsetsCompat.Type.statusBars());
-            controller.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
-        }
+        controller.hide(WindowInsetsCompat.Type.statusBars());
+        controller.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
 
         EventBus.getDefault().register(this);
@@ -103,7 +102,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         initView();
         // 初始化服务
         initService();
-        
+
         // 显示本机 IP 地址
         String ip = getHostIP();
         localIpTextView.setText(ip);
@@ -176,6 +175,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     /**
      * 获取本机 IPv4 地址
+     *
      * @return ip地址
      */
     public String getHostIP() {
@@ -261,7 +261,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     /**
      * 关闭悬浮窗
      */
-    private void dismassFloatWindow() {
+    private void dismissFloatWindow() {
         if (floatWindowIsShow) {
             floatWindowIsShow = false;
             windowManager.removeView(displayView);
@@ -334,8 +334,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 layoutParams.height = (int) (height * 0.8);
                 break;
             case 4:
-                layoutParams.width = width;
-                layoutParams.height = height;
+                layoutParams.width = width / 3;
+                layoutParams.height = height / 3;
                 break;
             default:
                 break;
@@ -502,7 +502,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             playButton.setText("停止");
             playButton.setEnabled(true);
         } else {
-            dismassFloatWindow();
+            dismissFloatWindow();
             playButton.setText("播放");
             playButton.setEnabled(true);
         }

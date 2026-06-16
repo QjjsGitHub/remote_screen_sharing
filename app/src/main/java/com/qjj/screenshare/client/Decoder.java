@@ -1,4 +1,4 @@
-package com.qjj.screenshare.server;
+package com.qjj.screenshare.client;
 
 import android.media.MediaCodec;
 import android.media.MediaFormat;
